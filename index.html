@@ -23,8 +23,9 @@
 @media(max-width:800px){.wrap{grid-template-columns:1fr}}
 /* ---- 셀프 체크인(키오스크) ---- */
 body.kiosk{background:#000;overflow:hidden;height:100vh}
+.k-title{top:auto!important;bottom:calc(45% + min(29vw,25vh) + 1.5vh);font-size:min(5vw,36px)!important}
 .k-cam{position:fixed;inset:0;background:#000}.k-cam video{width:100%;height:100%;object-fit:cover}.k-cam video.mirror{transform:scaleX(-1)}
-.k-guide{position:fixed;left:50%;top:46%;width:min(62vw,62vh);height:min(62vw,62vh);transform:translate(-50%,-50%);border:6px solid #fff;border-radius:28px;box-shadow:0 0 0 9999px #000a}
+.k-guide{position:fixed;left:50%;top:55%;width:min(58vw,50vh);height:min(58vw,50vh);transform:translate(-50%,-50%);border:6px solid #fff;border-radius:28px;box-shadow:0 0 0 9999px #000a}
 .k-title{position:fixed;left:0;right:0;top:4vh;text-align:center;color:#fff;font-size:min(6vw,44px);font-weight:800;letter-spacing:-1px;text-shadow:0 2px 12px #000}
 .k-sub{position:fixed;left:0;right:0;bottom:6vh;text-align:center;color:#ddd;font-size:min(3.4vw,22px)}
 .k-cnt{position:fixed;right:14px;bottom:10px;color:#888;font-size:13px}
@@ -36,6 +37,21 @@ body.kiosk{background:#000;overflow:hidden;height:100vh}
 .k-corner{position:fixed;left:0;top:0;width:90px;height:90px;z-index:25}
 .k-menu{position:fixed;inset:0;z-index:40;background:#000c;display:none;align-items:center;justify-content:center;padding:16px}.k-menu.on{display:flex}
 .k-box{background:#fff;color:#1a1a1a;border-radius:18px;padding:20px;width:min(520px,100%);max-height:90vh;overflow:auto}
+/* ---- 결과 팝업·안내 ---- */
+.pop{position:fixed;inset:0;z-index:50;background:#0008;display:none;align-items:center;justify-content:center;padding:5vw}.pop.on{display:flex}
+.pop .card{width:min(680px,100%);border-radius:28px;padding:min(6vw,44px) min(5vw,36px);text-align:center;box-shadow:0 20px 60px #0006;animation:popin .18s ease-out}
+@keyframes popin{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+.pop .ic{width:min(22vw,130px);height:min(22vw,130px);border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:min(14vw,84px);font-weight:900;color:#fff}
+.pop .m{font-size:min(6vw,38px);font-weight:800;letter-spacing:-1px;line-height:1.3}.pop .s{font-size:min(4vw,22px);margin-top:10px;opacity:.85}.pop .x{font-size:13px;margin-top:14px;opacity:.6}
+.pop.ok .card{background:#e7f8ec;color:#0b6b2a}.pop.ok .ic{background:#1aae39}
+.pop.dup .card{background:#fff6dc;color:#7a5200}.pop.dup .ic{background:#f5b301}
+.pop.bad .card{background:#fdecec;color:#b42318}.pop.bad .ic{background:#e03131}
+.guide{background:#eef0ff;color:#2b2280;border-radius:12px;padding:10px 14px;font-weight:700;margin:0 0 10px;font-size:16px}
+.tip{color:#fff;background:#0009;border-radius:999px;padding:6px 14px;font-size:14px;position:absolute;left:50%;bottom:10px;transform:translateX(-50%);white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.k-steps{position:fixed;left:0;right:0;top:2.5vh;display:flex;justify-content:center;gap:min(3vw,24px);padding:0 3vw;z-index:5}
+.k-step{background:#ffffffee;color:#0a1530;border-radius:18px;padding:min(1.6vw,12px) min(2.4vw,18px);display:flex;align-items:center;gap:10px;font-size:min(2.8vw,22px);font-weight:800;box-shadow:0 4px 16px #0004}
+.k-step i{font-style:normal;font-size:min(5vw,40px)}.k-step b{display:inline-block;background:#5645d4;color:#fff;border-radius:50%;width:1.6em;height:1.6em;line-height:1.6em;text-align:center;font-size:.8em}
+.k-tip{position:fixed;left:0;right:0;bottom:12vh;text-align:center;z-index:5}.k-tip span{background:#000b;color:#fff;border-radius:999px;padding:10px 22px;font-size:min(3.6vw,26px);font-weight:700}
 </style></head><body>
 <div id="main"></div>
 <script>
@@ -65,18 +81,36 @@ const REC=[];
 function recAdd(cls,txt){ REC.unshift({t:new Date().toTimeString().slice(0,8),c:cls,x:txt}); REC.length=Math.min(REC.length,10); const el=$('rec'); if(el) el.innerHTML=recHTML() }
 function recHTML(){ return REC.map(r=>'<div><span>'+r.t+'</span><b style="color:'+(r.c==='ok'?'#0b6b2a':r.c==='dup'?'#8a5a00':'#e03131')+'">'+esc(r.x)+'</b></div>').join('')||'<span class="note">없음</span>' }
 let COUNT='–';
-async function stat(){ try{ const r=await api({action:'stat'}); if(r.r==='ok'){ COUNT=r.checked+' / '+r.total; const el=$('cnt'); if(el) el.innerHTML=KIOSK?'출석 '+esc(COUNT):r.checked+' <small>/ '+r.total+' 출석 · '+esc(r.now)+'</small>' } else if(r.r==='nosession') lock('세션이 끝났거나 끊겼습니다.') }catch(e){} }
+async function stat(){ try{ const r=await api({action:'stat'}); if(r.r==='ok'){ COUNT=r.checked+' / '+r.total; const el=$('cnt'); if(el) el.innerHTML=KIOSK?'출석 '+esc(COUNT):r.checked+' <small>/ '+r.total+' 출석 · '+esc(r.now)+'</small>' } else if(r.r==='nosession'){ SESS_ERR=true; const el=$('cnt'); if(el) el.innerHTML=KIOSK?'세션 끊김':'세션 끊김 — 운영자에게' } }catch(e){} }
 
 /** QR 글자 → 서버 기록 → {cls, r} */
-let LAST={t:'',at:0},BUSY=false;
+let LAST={t:'',at:0},BUSY=false,SESS_ERR=false;
 const REPEAT_MS=KIOSK?8000:3000;   // 같은 QR 다시 읽지 않는 시간 (셀프 모드는 결과 화면 동안 들고 있어도 중복 안 뜨게 길게)
 async function handle(text){
   const now=Date.now(); if(text===LAST.t&&now-LAST.at<REPEAT_MS) return; if(BUSY||PAUSE) return; LAST={t:text,at:now};
   const tok=tokenOf(text); if(!tok) return show({r:'invalid',local:true});
   BUSY=true;
-  try{ const r=await api({action:'scan',tok:API+'?p='+tok,dev:DEV}); BUSY=false; if(r.r==='nosession') return lock('세션이 끝났거나 끊겼습니다.'); show(r); if(r.r==='ok') stat() }
+  try{ const r=await api({action:'scan',tok:API+'?p='+tok,dev:DEV}); BUSY=false; if(r.r==='nosession') SESS_ERR=true; show(r); if(r.r==='ok') stat() }
   catch(e){ BUSY=false; show({r:'net'}) }
 }
+
+/* ---------- 결과 팝업 (공통 문구) ---------- */
+const TIPS=['휴대폰 화면 밝기를 최대로','빛 반사 없이 QR을 화면 가운데 상자에 맞춰 주세요','10~20cm 거리에서 잠시 멈춰 주세요'];
+let TIPI=0;setInterval(()=>{TIPI=(TIPI+1)%TIPS.length;const el=$('tip');if(el)el.textContent=TIPS[TIPI]},3500);
+let POPT=0;
+function popup(r){
+  const ok=r.r==='ok',dup=r.r==='dup',cls=ok?'ok':dup?'dup':'bad';
+  const m=ok?esc(r.team)+'번 팀, '+esc(r.label)+'님 출석체크 되었습니다.':dup?esc(r.label)+'님은 이미 출석체크 하였습니다.':'확인되지 않았습니다. 안내데스크로 문의해 주세요.';
+  const sub=ok?(KIOSK?'명찰을 받아 가세요':''):dup?'체크 시각 '+esc(r.t):'';
+  const ms=KIOSK?(ok?2500:dup?3000:4000):2000;
+  let el=$('pop'); if(!el){ el=document.createElement('div'); el.id='pop'; document.body.appendChild(el) }
+  el.className='pop on '+cls; el.innerHTML='<div class="card"><div class="ic">'+(ok?'✓':dup?'!':'✕')+'</div><div class="m">'+m+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+(KIOSK?'':'<div class="x">탭하면 닫힘</div>')+'</div>';
+  el.onclick=KIOSK?null:closePop;
+  tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad');
+  recAdd(cls,ok?(r.team+'번 '+r.label+' ✓'):dup?(r.label+' 이미 체크'):('실패 · '+(r.r||'')));
+  PAUSE=true; clearTimeout(POPT); POPT=setTimeout(closePop,ms);
+}
+function closePop(){ clearTimeout(POPT); const el=$('pop'); if(el) el.className='pop'; PAUSE=false }
 
 /* ---------- 카메라 (공통) ---------- */
 let CAM={st:null,raf:0},FACING=KIOSK?'user':'environment',PAUSE=false;
@@ -105,30 +139,21 @@ function lock(msg){ stopCam(); document.body.className=''; $('main').innerHTML='
 /* ---------- 운영자 모드 화면 ---------- */
 function staffUI(){
   $('main').innerHTML=`<div class="top"><b>BIX 킥오프 출석 스캔</b><span class="sp"></span><span class="cnt" id="cnt">– <small>출석</small></span></div>
- <div class="wrap"><div><div class="cam"><video id="v" playsinline muted></video><div class="frame"></div><div class="ph" id="ph">「카메라 켜기」를 누르고<br>참가자 휴대폰의 개인 QR을 네모 안에 비춰 주세요</div></div>
+ <div class="wrap"><div><div class="guide">참가자 휴대폰 QR을 상자에 맞춰 찍어 주세요</div><div class="cam"><video id="v" playsinline muted></video><div class="frame"></div><div class="tip" id="tip">${TIPS[0]}</div><div class="ph" id="ph">「카메라 켜기」를 누르고<br>참가자 휴대폰의 개인 QR을 상자에 맞춰 주세요</div></div>
  <div class="row"><button class="btn" id="cb" onclick="staffToggle()">카메라 켜기</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" capture="environment" style="display:none" onchange="photo(this)"></label></div>
  <p class="note" id="note">연속 스캔 · 같은 QR은 3초 안에 다시 읽지 않음</p></div>
- <div><div class="res" id="res"><div class="big">대기 중</div><div class="sub">QR을 비춰 주세요</div></div><h3 style="margin:14px 0 6px;font-size:15px">최근 10건</h3><div class="rec" id="rec">${recHTML()}</div></div></div>`;
+ <div><h3 style="margin:0 0 6px;font-size:15px">최근 10건</h3><div class="rec" id="rec">${recHTML()}</div></div></div>`;
 }
 async function staffToggle(){ if(CAM.st){ stopCam(); $('cb').textContent='카메라 켜기'; $('ph').style.display=''; return }
   try{ await startCam(); $('ph').style.display='none'; $('cb').textContent='카메라 끄기' }catch(e){ $('note').textContent='카메라를 열 수 없어요('+(e&&e.name||'')+') → 브라우저 카메라 권한 허용 또는 「사진으로 스캔」' } }
-function staffShow(r){
-  let cls='bad',big='✕ 없는 QR',sub='명단에 없는 QR — 수동 검색';
-  const who=esc(r.team)+'팀 '+esc(r.label), kind=r.type==='기업'?'참여기업':esc(r.school||'')+' 학생';
-  if(r.r==='ok'){cls='ok';big='✓ '+who;sub=kind+' · '+esc(r.t)+' 출석'}
-  else if(r.r==='dup'){cls='dup';big='⚠ 이미 체크 '+esc(r.t);sub=who+' ('+esc(r.m)+')'}
-  else if(r.r==='revoked'){big='✕ 재발급 전 QR';sub='새로 받은 문자의 QR을 보여 달라고 안내'}
-  else if(r.r==='invalid'&&r.local){big='✕ 없는 QR';sub='행사 개인 QR이 아닙니다'}
-  else if(r.r==='rate'||r.r==='busy'){cls='dup';big='잠시 후 다시';sub='요청이 몰렸어요'}
-  else if(r.r==='net'){cls='dup';big='연결 끊김';sub='수동 검색 체크로 기록하세요'}
-  const el=$('res'); el.className='res '+cls; el.innerHTML='<div class="big">'+big+'</div><div class="sub">'+sub+'</div>'; tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad'); recAdd(cls,big.replace(/<[^>]+>/g,''));
-}
+function staffShow(r){ return popup(r) }
 
 /* ---------- 셀프 체크인(키오스크) 화면 ---------- */
 function kioskUI(){
   document.body.className='kiosk';
   $('main').innerHTML=`<div class="k-cam"><video id="v" playsinline muted autoplay></video></div><div class="k-guide"></div>
- <div class="k-title">휴대폰 QR을 여기에 비춰 주세요</div><div class="k-sub">문자로 받은 「출석 QR」 화면 · 화면 밝기를 올려 주세요</div><div class="k-cnt" id="cnt"></div>
+ <div class="k-steps"><div class="k-step"><b>1</b><i>💬</i>문자 링크 열기</div><div class="k-step"><b>2</b><i>🔆</i>밝기 올리기</div><div class="k-step"><b>3</b><i>🔲</i>상자에 비추기</div></div>
+ <div class="k-title">휴대폰 QR을 여기에 비춰 주세요</div><div class="k-tip"><span id="tip">${TIPS[0]}</span></div><div class="k-cnt" id="cnt"></div>
  <div class="k-over" id="over"></div>
  <div class="k-start" id="start" onclick="kioskStart(true)">눌러서 시작<small>카메라를 켜고 셀프 체크인을 시작합니다</small></div>
  <div class="k-corner" id="corner"></div>
@@ -156,20 +181,11 @@ async function flipCam(){ FACING=FACING==='user'?'environment':'user'; await kio
 let WL=null,WL_OK=null;
 async function wake(){ try{ if('wakeLock' in navigator){ WL=await navigator.wakeLock.request('screen'); WL_OK=true } else WL_OK=false }catch(e){ WL_OK=false } }
 document.addEventListener('visibilitychange',()=>{ if(KIOSK&&document.visibilityState==='visible'){ wake(); kioskWatch() } });
-function info(){ return '카메라: '+(FACING==='user'?'전면':'후면')+' · 화면 꺼짐 방지: '+(WL_OK?'켜짐':'미지원 → 아이패드 설정 › 디스플레이 › 자동 잠금 「안 함」')+' · 출석 '+COUNT+' · 기기 '+DEV }
+function info(){ return (SESS_ERR?'⚠ 세션 끊김 — 운영자 화면에서 셀프 QR 다시 발급 · ':'')+'카메라: '+(FACING==='user'?'전면':'후면')+' · 화면 꺼짐 방지: '+(WL_OK?'켜짐':'미지원 → 아이패드 설정 › 디스플레이 › 자동 잠금 「안 함」')+' · 출석 '+COUNT+' · 기기 '+DEV }
 function openMenu(){ $('mInfo').textContent=info(); $('rec').innerHTML=recHTML(); $('menu').classList.add('on') }
 function closeMenu(){ $('menu').classList.remove('on') }
 let OVT=0;
-function kioskShow(r){
-  let cls='bad',ic='✕',t1='확인할 수 없는 QR',t2='등록데스크로 와 주세요',ms=3000;
-  if(r.r==='ok'){cls='ok';ic='✓';t1=esc(r.label)+'님 출석 완료';t2=esc(r.team)+'팀 · 명찰을 받아 가세요';ms=2500}
-  else if(r.r==='dup'){cls='dup';ic='⚠';t1='이미 체크됨 '+esc(r.t);t2='등록데스크로 와 주세요';ms=3500}
-  else if(r.r==='revoked'){t1='지난 QR입니다';t2='새로 받은 문자의 QR을 보여 주시거나 등록데스크로'}
-  else if(r.r==='net'||r.r==='rate'||r.r==='busy'){cls='dup';ic='…';t1='잠시 후 다시 비춰 주세요';t2='계속 안 되면 등록데스크로';ms=2500}
-  const o=$('over'); o.className='k-over on '+cls; o.innerHTML='<div class="ic">'+ic+'</div><div class="t1">'+t1+'</div><div class="t2">'+t2+'</div>';
-  tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad'); recAdd(cls,(r.team?r.team+'팀 ':'')+(r.label||'')+' '+(r.r||''));
-  PAUSE=true; clearTimeout(OVT); OVT=setTimeout(()=>{ o.className='k-over'; PAUSE=false },ms);   // 자동 복귀
-}
+function kioskShow(r){ return popup(r) }
 function show(r){ KIOSK?kioskShow(r):staffShow(r) }
 
 /* ---------- 시작 ---------- */

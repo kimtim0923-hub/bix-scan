@@ -13,7 +13,7 @@
 --ok:#B3D000;--dup:#FFD43B;--bad:#F04438;--wait:#3B82F6}
 *{box-sizing:border-box}
 body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);-webkit-user-select:none;user-select:none;min-height:100vh}
-.ribbon{position:fixed;right:0;bottom:0;width:min(560px,62vw);height:min(640px,72vh);background:url(assets/ribbon.webp) right bottom/contain no-repeat;opacity:.5;pointer-events:none;z-index:0}
+.ribbon{position:fixed;right:0;bottom:0;width:min(560px,62vw);height:min(640px,72vh);background:url(assets/ribbon.webp) right bottom/contain no-repeat;opacity:.5;pointer-events:none;z-index:0;mix-blend-mode:screen}  /* 검정 바탕 이미지 → screen 합성으로 검정 부분은 투명처럼 */
 #main{position:relative;z-index:1}
 .badge{display:inline-block;background:var(--lime);color:#000;font-weight:900;border-radius:6px 6px 6px 0;padding:2px 9px;letter-spacing:-.3px}
 .lime{color:var(--lime)}
@@ -36,7 +36,7 @@ h3{color:#fff}.rec div{display:flex;justify-content:space-between;padding:7px 2p
 body.kiosk{overflow:hidden;height:100vh}
 body.kiosk #main{position:static;z-index:auto}
 .k-cam{position:fixed;inset:0;background:#000;z-index:0}.k-cam video{width:100%;height:100%;object-fit:cover}.k-cam video.mirror{transform:scaleX(-1)}
-body.kiosk .ribbon{z-index:2;opacity:.55;width:min(40vw,40vh);height:min(46vw,46vh)}
+body.kiosk .ribbon{z-index:2;opacity:.75;width:min(30vw,34vh);height:min(26vw,17vh)}  /* 가이드 상자와 겹치지 않게 모서리에만 */
 .k-guide{position:fixed;left:50%;top:60%;width:min(54vw,44vh);height:min(54vw,44vh);transform:translate(-50%,-50%);border:7px solid var(--lime);border-radius:30px;box-shadow:0 0 0 9999px #000d;z-index:1}
 .k-head{position:fixed;left:0;right:0;top:2.2vh;text-align:center;z-index:5;font-weight:900;letter-spacing:-1px;font-size:min(4.6vw,34px)}
 .k-head .badge{font-size:.8em;margin-right:8px;vertical-align:.08em}

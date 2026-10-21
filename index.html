@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>BIX 출석 스캔</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o" crossorigin="anonymous"></script>
 <style>
 :root{--navy:#0a1530;--mint:#d9f3e1;--yellow:#fef7d6;--red:#fde8e8;--surface:#f6f5f4;--primary:#5645d4}
-*{box-sizing:border-box}body{margin:0;font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;background:#fff;color:#1a1a1a}
+*{box-sizing:border-box}body{margin:0;font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;background:#fff;color:#1a1a1a;-webkit-user-select:none;user-select:none}
 .top{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.top b{font-size:17px}.sp{flex:1}
 .cnt{background:#1a2a52;border-radius:10px;padding:4px 12px;font-weight:700;font-size:18px}.cnt small{font-size:12px;color:#a4a097;font-weight:400}
 .wrap{display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:14px;padding:14px;max-width:1100px;margin:0 auto}
@@ -20,77 +21,159 @@
 .rec div{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid #eee;font-size:14px}.note{color:#787671;font-size:13px}
 .lock{max-width:420px;margin:60px auto;text-align:center;padding:0 16px}
 @media(max-width:800px){.wrap{grid-template-columns:1fr}}
+/* ---- 셀프 체크인(키오스크) ---- */
+body.kiosk{background:#000;overflow:hidden;height:100vh}
+.k-cam{position:fixed;inset:0;background:#000}.k-cam video{width:100%;height:100%;object-fit:cover}.k-cam video.mirror{transform:scaleX(-1)}
+.k-guide{position:fixed;left:50%;top:46%;width:min(62vw,62vh);height:min(62vw,62vh);transform:translate(-50%,-50%);border:6px solid #fff;border-radius:28px;box-shadow:0 0 0 9999px #000a}
+.k-title{position:fixed;left:0;right:0;top:4vh;text-align:center;color:#fff;font-size:min(6vw,44px);font-weight:800;letter-spacing:-1px;text-shadow:0 2px 12px #000}
+.k-sub{position:fixed;left:0;right:0;bottom:6vh;text-align:center;color:#ddd;font-size:min(3.4vw,22px)}
+.k-cnt{position:fixed;right:14px;bottom:10px;color:#888;font-size:13px}
+.k-over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:5vw;z-index:20}
+.k-over.on{display:flex}.k-over .ic{font-size:min(28vw,220px);line-height:1;font-weight:900}.k-over .t1{font-size:min(7vw,60px);font-weight:900;letter-spacing:-1.5px;margin-top:10px}.k-over .t2{font-size:min(4vw,30px);margin-top:14px;font-weight:600}
+.k-over.ok{background:#1aae39;color:#fff}.k-over.dup{background:#f5b301;color:#2a1d00}.k-over.bad{background:#e03131;color:#fff}
+.k-start{position:fixed;inset:0;z-index:30;background:#0a1530;color:#fff;display:none;align-items:center;justify-content:center;text-align:center;font-size:min(7vw,52px);font-weight:800;flex-direction:column;gap:16px}
+.k-start.on{display:flex}.k-start small{font-size:min(3.4vw,20px);font-weight:400;color:#a4a097}
+.k-corner{position:fixed;left:0;top:0;width:90px;height:90px;z-index:25}
+.k-menu{position:fixed;inset:0;z-index:40;background:#000c;display:none;align-items:center;justify-content:center;padding:16px}.k-menu.on{display:flex}
+.k-box{background:#fff;color:#1a1a1a;border-radius:18px;padding:20px;width:min(520px,100%);max-height:90vh;overflow:auto}
 </style></head><body>
-<div class="top"><b>BIX 킥오프 출석 스캔</b><span class="sp"></span><span class="cnt" id="cnt">– <small>출석</small></span></div>
 <div id="main"></div>
 <script>
 'use strict';
-/* 코드만 있는 페이지 — 명단·연락처 없음. 세션·API 주소는 운영자 화면에서 받은 링크의 # 뒤에서만 읽고 바로 지움 */
+/* 코드만 있는 페이지 — 명단·연락처 없음. 세션·API 주소·모드는 운영자 화면에서 받은 링크의 # 뒤에서만 읽고 바로 지움 */
 const API_RE=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/;
-let S='',API='';
+let S='',API='',MODE='';
 (function(){
-  const h=new URLSearchParams(location.hash.slice(1));
-  if(h.get('s')&&h.get('api')){ try{ sessionStorage.setItem('bix_s',h.get('s')); sessionStorage.setItem('bix_api',h.get('api')) }catch(e){} S=h.get('s'); API=h.get('api') }
-  else { try{ S=sessionStorage.getItem('bix_s')||''; API=sessionStorage.getItem('bix_api')||'' }catch(e){} }
+  const h=new URLSearchParams(location.hash.slice(1)), ss=(k,v)=>{try{v===undefined?0:sessionStorage.setItem(k,v);return sessionStorage.getItem(k)||''}catch(e){return v||''}};
+  if(h.get('s')&&h.get('api')){ S=ss('bix_s',h.get('s')); API=ss('bix_api',h.get('api')); MODE=ss('bix_mode',h.get('mode')==='kiosk'?'kiosk':'staff') }
+  else { S=ss('bix_s'); API=ss('bix_api'); MODE=ss('bix_mode') }
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
 })();
+const KIOSK=MODE==='kiosk';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const DEV=(()=>{try{let d=localStorage.getItem('bix_scan_dev');if(!d){d=Math.random().toString(36).slice(2,10).toUpperCase();localStorage.setItem('bix_scan_dev',d)}return d}catch(e){return 'X'}})();
-function lock(msg){ $('main').innerHTML='<div class="lock"><h2>스캔 페이지를 열 수 없어요</h2><p class="note">'+msg+'</p><p class="note">운영자 화면 › QR 스캔 › 「📷 카메라 스캔 열기」로 다시 열어 주세요.</p></div>'; stopCam() }
-if(!S||!API_RE.test(API)) lock('세션 정보가 없습니다.');
-else $('main').innerHTML=`<div class="wrap"><div><div class="cam"><video id="v" playsinline muted></video><div class="frame"></div><div class="ph" id="ph">「카메라 켜기」를 누르고<br>참가자 휴대폰의 개인 QR을 네모 안에 비춰 주세요</div></div>
- <div class="row"><button class="btn" id="cb" onclick="toggleCam()">카메라 켜기</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" capture="environment" style="display:none" onchange="photo(this)"></label></div>
- <p class="note" id="note">연속 스캔 · 같은 QR은 3초 안에 다시 읽지 않음</p></div>
- <div><div class="res" id="res"><div class="big">대기 중</div><div class="sub">QR을 비춰 주세요</div></div><h3 style="margin:14px 0 6px;font-size:15px">최근 10건</h3><div class="rec" id="rec"><span class="note">없음</span></div></div></div>`;
+const DEV=(KIOSK?'K':'')+(()=>{try{let d=localStorage.getItem('bix_scan_dev');if(!d){d=Math.random().toString(36).slice(2,10).toUpperCase();localStorage.setItem('bix_scan_dev',d)}return d}catch(e){return 'X'}})();
 
-/** 우리 참가자용 주소 형식(API?p=토큰)만 허용 → 토큰만 뽑음 */
+/* ---------- 공통: API·토큰·소리 ---------- */
 function tokenOf(text){ text=String(text||'').trim(); if(!text.startsWith(API+'?p=')) return ''; const t=text.slice(API.length+3).split(/[&#]/)[0]; return /^[A-Za-z2-7]{16,40}$/.test(t)?t.toUpperCase():'' }
-async function api(body){
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({s:S},body)),redirect:'follow'});
-  return r.json();
-}
-let audio=null;function tone(k){ try{navigator.vibrate&&navigator.vibrate(k==='ok'?120:[80,60,80])}catch(e){}
-  try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); (k==='ok'?[1320]:k==='dup'?[880,880]:[300]).forEach((hz,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=hz;g.gain.value=.12;o.connect(g);g.connect(audio.destination);o.start(audio.currentTime+i*.18);o.stop(audio.currentTime+i*.18+.13)}) }catch(e){} }
+async function api(body){ const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({s:S},body)),redirect:'follow'}); return r.json() }
+let audio=null;
+function tone(k){ try{navigator.vibrate&&navigator.vibrate(k==='ok'?150:[90,70,90])}catch(e){}
+  try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); const g0=KIOSK?.35:.12;
+    (k==='ok'?[1047,1568]:k==='dup'?[880,880]:[330,247]).forEach((hz,i)=>{const o=audio.createOscillator(),g=audio.createGain();o.type=k==='ok'?'sine':'square';o.frequency.value=hz;g.gain.value=k==='ok'?g0:g0*.5;o.connect(g);g.connect(audio.destination);o.start(audio.currentTime+i*.16);o.stop(audio.currentTime+i*.16+.14)}) }catch(e){} }
 const REC=[];
-function show(cls,big,sub){ const el=$('res'); el.className='res '+cls; el.innerHTML='<div class="big">'+big+'</div><div class="sub">'+sub+'</div>'; tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad');
-  REC.unshift({t:new Date().toTimeString().slice(0,8),c:cls,x:big}); REC.length=Math.min(REC.length,10);
-  $('rec').innerHTML=REC.map(r=>'<div><span>'+r.t+'</span><b style="color:'+(r.c==='ok'?'#0b6b2a':r.c==='dup'?'#8a5a00':'#e03131')+'">'+r.x+'</b></div>').join('') }
+function recAdd(cls,txt){ REC.unshift({t:new Date().toTimeString().slice(0,8),c:cls,x:txt}); REC.length=Math.min(REC.length,10); const el=$('rec'); if(el) el.innerHTML=recHTML() }
+function recHTML(){ return REC.map(r=>'<div><span>'+r.t+'</span><b style="color:'+(r.c==='ok'?'#0b6b2a':r.c==='dup'?'#8a5a00':'#e03131')+'">'+esc(r.x)+'</b></div>').join('')||'<span class="note">없음</span>' }
+let COUNT='–';
+async function stat(){ try{ const r=await api({action:'stat'}); if(r.r==='ok'){ COUNT=r.checked+' / '+r.total; const el=$('cnt'); if(el) el.innerHTML=KIOSK?'출석 '+esc(COUNT):r.checked+' <small>/ '+r.total+' 출석 · '+esc(r.now)+'</small>' } else if(r.r==='nosession') lock('세션이 끝났거나 끊겼습니다.') }catch(e){} }
+
+/** QR 글자 → 서버 기록 → {cls, r} */
 let LAST={t:'',at:0},BUSY=false;
+const REPEAT_MS=KIOSK?8000:3000;   // 같은 QR 다시 읽지 않는 시간 (셀프 모드는 결과 화면 동안 들고 있어도 중복 안 뜨게 길게)
 async function handle(text){
-  const now=Date.now(); if(text===LAST.t&&now-LAST.at<3000) return; LAST={t:text,at:now};
-  const tok=tokenOf(text); if(!tok){ show('bad','✕ 없는 QR','행사 개인 QR이 아닙니다'); return }
-  if(BUSY) return; BUSY=true;
-  try{ const r=await api({action:'scan',tok:API+'?p='+tok,dev:DEV}); BUSY=false;
-    const who=esc(r.team)+'팀 '+esc(r.label), kind=r.type==='기업'?'참여기업':esc(r.school||'')+' 학생';
-    if(r.r==='ok') show('ok','✓ '+who,kind+' · '+esc(r.t)+' 출석');
-    else if(r.r==='dup') show('dup','⚠ 이미 체크 '+esc(r.t),who+' ('+esc(r.m)+')');
-    else if(r.r==='revoked') show('bad','✕ 재발급 전 QR','새로 받은 문자의 QR을 보여 달라고 안내');
-    else if(r.r==='invalid') show('bad','✕ 없는 QR','명단에 없는 QR — 수동 검색');
-    else if(r.r==='nosession') lock('세션이 끝났거나 끊겼습니다.');
-    else if(r.r==='rate'||r.r==='busy') show('dup','잠시 후 다시','요청이 몰렸어요');
-    else show('bad','✕ 처리 실패',esc(r.r));
-    if(r.r==='ok') stat();
-  }catch(e){ BUSY=false; show('dup','연결 끊김','수동 검색 체크로 기록하세요') }
+  const now=Date.now(); if(text===LAST.t&&now-LAST.at<REPEAT_MS) return; if(BUSY||PAUSE) return; LAST={t:text,at:now};
+  const tok=tokenOf(text); if(!tok) return show({r:'invalid',local:true});
+  BUSY=true;
+  try{ const r=await api({action:'scan',tok:API+'?p='+tok,dev:DEV}); BUSY=false; if(r.r==='nosession') return lock('세션이 끝났거나 끊겼습니다.'); show(r); if(r.r==='ok') stat() }
+  catch(e){ BUSY=false; show({r:'net'}) }
 }
-async function stat(){ try{ const r=await api({action:'stat'}); if(r.r==='ok') $('cnt').innerHTML=r.checked+' <small>/ '+r.total+' 출석 · '+esc(r.now)+'</small>'; else if(r.r==='nosession') lock('세션이 끝났거나 끊겼습니다.') }catch(e){} }
-let CAM={st:null,raf:0};
-function stopCam(){ if(CAM.raf)cancelAnimationFrame(CAM.raf); CAM.raf=0; if(CAM.st){CAM.st.getTracks().forEach(t=>t.stop());CAM.st=null} const b=$('cb'); if(b)b.textContent='카메라 켜기'; const p=$('ph'); if(p)p.style.display='' }
-async function toggleCam(){ if(CAM.st) return stopCam();
-  if(typeof jsQR!=='function'||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('note').textContent='카메라를 쓸 수 없어요 → 「사진으로 스캔」'; return }
-  try{ CAM.st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}) }catch(e){ $('note').textContent='카메라를 열 수 없어요('+(e&&e.name||'')+') → 브라우저 카메라 권한 허용 또는 「사진으로 스캔」'; return }
-  const v=$('v'); v.srcObject=CAM.st; v.setAttribute('playsinline',''); v.muted=true; try{await v.play()}catch(e){}
-  $('ph').style.display='none'; $('cb').textContent='카메라 끄기';
+
+/* ---------- 카메라 (공통) ---------- */
+let CAM={st:null,raf:0},FACING=KIOSK?'user':'environment',PAUSE=false;
+function stopCam(){ if(CAM.raf)cancelAnimationFrame(CAM.raf); CAM.raf=0; if(CAM.st){CAM.st.getTracks().forEach(t=>t.stop());CAM.st=null} }
+async function startCam(){
+  if(typeof jsQR!=='function'||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('nocam'),{name:'NoCamera'});
+  stopCam();
+  CAM.st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:FACING},width:{ideal:1280},height:{ideal:720}},audio:false});
+  CAM.st.getVideoTracks().forEach(t=>t.addEventListener('ended',()=>{ if(KIOSK) setTimeout(kioskStart,800) }));
+  const v=$('v'); v.srcObject=CAM.st; v.setAttribute('playsinline',''); v.muted=true; await v.play();
+  if(KIOSK) v.classList.toggle('mirror',FACING==='user');
   const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});
-  const loop=()=>{ if(!CAM.st) return; if(v.readyState>=2&&v.videoWidth){ const w=Math.min(720,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth); c.width=w;c.height=h;x.drawImage(v,0,0,w,h);
-    const q=jsQR(x.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'}); if(q&&q.data) handle(q.data) } CAM.raf=requestAnimationFrame(loop) }; loop() }
+  const loop=()=>{ if(!CAM.st) return; if(!PAUSE&&v.readyState>=2&&v.videoWidth){ const w=Math.min(720,v.videoWidth),h=Math.round(v.videoHeight*w/v.videoWidth); c.width=w;c.height=h;x.drawImage(v,0,0,w,h);
+    const q=jsQR(x.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'dontInvert'}); if(q&&q.data) handle(q.data) } CAM.raf=requestAnimationFrame(loop) }; loop();
+}
 async function photo(inp){ const f=inp.files&&inp.files[0]; if(!f||typeof jsQR!=='function') return; const url=URL.createObjectURL(f);
   const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url}).catch(()=>null); URL.revokeObjectURL(url); inp.value='';
-  if(!img){ show('bad','✕ 사진 오류','다시 찍어 주세요'); return }
+  if(!img) return show({r:'invalid',local:true});
   for(const mx of [1600,1000,700]){ const sc=Math.min(1,mx/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.round(img.naturalWidth*sc),h=Math.round(img.naturalHeight*sc);
     const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);
     const q=jsQR(x.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'attemptBoth'}); if(q&&q.data){ LAST={t:'',at:0}; return handle(q.data) } }
-  show('bad','✕ QR 못 찾음','QR이 크게 나오게 다시 찍어 주세요') }
-if(S&&API_RE.test(API)){ stat(); setInterval(stat,30000) }
+  show({r:'invalid',local:true}) }
+
+function lock(msg){ stopCam(); document.body.className=''; $('main').innerHTML='<div class="lock"><h2>스캔 페이지를 열 수 없어요</h2><p class="note">'+msg+'</p><p class="note">운영자 화면 › QR 스캔 › 「📷 카메라 스캔 열기」 또는 「📷 셀프 체크인 열기」로 다시 열어 주세요.</p></div>' }
+
+/* ---------- 운영자 모드 화면 ---------- */
+function staffUI(){
+  $('main').innerHTML=`<div class="top"><b>BIX 킥오프 출석 스캔</b><span class="sp"></span><span class="cnt" id="cnt">– <small>출석</small></span></div>
+ <div class="wrap"><div><div class="cam"><video id="v" playsinline muted></video><div class="frame"></div><div class="ph" id="ph">「카메라 켜기」를 누르고<br>참가자 휴대폰의 개인 QR을 네모 안에 비춰 주세요</div></div>
+ <div class="row"><button class="btn" id="cb" onclick="staffToggle()">카메라 켜기</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" capture="environment" style="display:none" onchange="photo(this)"></label></div>
+ <p class="note" id="note">연속 스캔 · 같은 QR은 3초 안에 다시 읽지 않음</p></div>
+ <div><div class="res" id="res"><div class="big">대기 중</div><div class="sub">QR을 비춰 주세요</div></div><h3 style="margin:14px 0 6px;font-size:15px">최근 10건</h3><div class="rec" id="rec">${recHTML()}</div></div></div>`;
+}
+async function staffToggle(){ if(CAM.st){ stopCam(); $('cb').textContent='카메라 켜기'; $('ph').style.display=''; return }
+  try{ await startCam(); $('ph').style.display='none'; $('cb').textContent='카메라 끄기' }catch(e){ $('note').textContent='카메라를 열 수 없어요('+(e&&e.name||'')+') → 브라우저 카메라 권한 허용 또는 「사진으로 스캔」' } }
+function staffShow(r){
+  let cls='bad',big='✕ 없는 QR',sub='명단에 없는 QR — 수동 검색';
+  const who=esc(r.team)+'팀 '+esc(r.label), kind=r.type==='기업'?'참여기업':esc(r.school||'')+' 학생';
+  if(r.r==='ok'){cls='ok';big='✓ '+who;sub=kind+' · '+esc(r.t)+' 출석'}
+  else if(r.r==='dup'){cls='dup';big='⚠ 이미 체크 '+esc(r.t);sub=who+' ('+esc(r.m)+')'}
+  else if(r.r==='revoked'){big='✕ 재발급 전 QR';sub='새로 받은 문자의 QR을 보여 달라고 안내'}
+  else if(r.r==='invalid'&&r.local){big='✕ 없는 QR';sub='행사 개인 QR이 아닙니다'}
+  else if(r.r==='rate'||r.r==='busy'){cls='dup';big='잠시 후 다시';sub='요청이 몰렸어요'}
+  else if(r.r==='net'){cls='dup';big='연결 끊김';sub='수동 검색 체크로 기록하세요'}
+  const el=$('res'); el.className='res '+cls; el.innerHTML='<div class="big">'+big+'</div><div class="sub">'+sub+'</div>'; tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad'); recAdd(cls,big.replace(/<[^>]+>/g,''));
+}
+
+/* ---------- 셀프 체크인(키오스크) 화면 ---------- */
+function kioskUI(){
+  document.body.className='kiosk';
+  $('main').innerHTML=`<div class="k-cam"><video id="v" playsinline muted autoplay></video></div><div class="k-guide"></div>
+ <div class="k-title">휴대폰 QR을 여기에 비춰 주세요</div><div class="k-sub">문자로 받은 「출석 QR」 화면 · 화면 밝기를 올려 주세요</div><div class="k-cnt" id="cnt"></div>
+ <div class="k-over" id="over"></div>
+ <div class="k-start" id="start" onclick="kioskStart(true)">눌러서 시작<small>카메라를 켜고 셀프 체크인을 시작합니다</small></div>
+ <div class="k-corner" id="corner"></div>
+ <div class="k-menu" id="menu"><div class="k-box"><h3 style="margin:0 0 8px">운영자 메뉴</h3><p class="note" id="mInfo"></p>
+  <div class="row"><button class="btn" onclick="flipCam()">전면/후면 전환</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" style="display:none" onchange="closeMenu();photo(this)"></label>
+  <button class="btn sec" onclick="kioskStart(true);closeMenu()">카메라 다시 켜기</button></div>
+  <h4 style="margin:14px 0 4px">최근 10건</h4><div class="rec" id="rec">${recHTML()}</div>
+  <div class="row" style="justify-content:flex-end"><button class="btn sec" onclick="closeMenu()">닫기</button></div></div></div>`;
+  // 왼쪽 위 모서리 3초 길게 누르기 → 운영자 메뉴
+  let t=0; const c=$('corner'), down=e=>{ e.preventDefault(); t=setTimeout(openMenu,3000) }, up=()=>clearTimeout(t);
+  c.addEventListener('touchstart',down,{passive:false}); c.addEventListener('mousedown',down); ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=>c.addEventListener(ev,up));
+  kioskStart(false); wake(); setInterval(kioskWatch,4000);
+}
+let STARTING=false;
+async function kioskStart(fromTap){
+  if(STARTING) return; STARTING=true;
+  try{ if(fromTap){ try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); audio.resume&&audio.resume() }catch(e){} }
+    await startCam(); $('start').classList.remove('on'); if(fromTap) wake() }
+  catch(e){ $('start').classList.add('on'); $('start').innerHTML=(e&&e.name==='NotAllowedError'?'카메라 허용이 필요해요':'눌러서 시작')+'<small>'+(e&&e.name==='NotAllowedError'?'사파리 설정 › 카메라 › 허용 후 눌러 주세요':'카메라를 켜고 셀프 체크인을 시작합니다')+'</small>' }
+  finally{ STARTING=false } }
+function kioskWatch(){ const v=$('v'); if(!v||$('start').classList.contains('on')) return;
+  const live=CAM.st&&CAM.st.getVideoTracks().some(t=>t.readyState==='live');
+  if(!live||v.paused) kioskStart(false) }          // 카메라가 멈추면 자동 재시작
+async function flipCam(){ FACING=FACING==='user'?'environment':'user'; await kioskStart(true); $('mInfo').textContent=info() }
+let WL=null,WL_OK=null;
+async function wake(){ try{ if('wakeLock' in navigator){ WL=await navigator.wakeLock.request('screen'); WL_OK=true } else WL_OK=false }catch(e){ WL_OK=false } }
+document.addEventListener('visibilitychange',()=>{ if(KIOSK&&document.visibilityState==='visible'){ wake(); kioskWatch() } });
+function info(){ return '카메라: '+(FACING==='user'?'전면':'후면')+' · 화면 꺼짐 방지: '+(WL_OK?'켜짐':'미지원 → 아이패드 설정 › 디스플레이 › 자동 잠금 「안 함」')+' · 출석 '+COUNT+' · 기기 '+DEV }
+function openMenu(){ $('mInfo').textContent=info(); $('rec').innerHTML=recHTML(); $('menu').classList.add('on') }
+function closeMenu(){ $('menu').classList.remove('on') }
+let OVT=0;
+function kioskShow(r){
+  let cls='bad',ic='✕',t1='확인할 수 없는 QR',t2='등록데스크로 와 주세요',ms=3000;
+  if(r.r==='ok'){cls='ok';ic='✓';t1=esc(r.label)+'님 출석 완료';t2=esc(r.team)+'팀 · 명찰을 받아 가세요';ms=2500}
+  else if(r.r==='dup'){cls='dup';ic='⚠';t1='이미 체크됨 '+esc(r.t);t2='등록데스크로 와 주세요';ms=3500}
+  else if(r.r==='revoked'){t1='지난 QR입니다';t2='새로 받은 문자의 QR을 보여 주시거나 등록데스크로'}
+  else if(r.r==='net'||r.r==='rate'||r.r==='busy'){cls='dup';ic='…';t1='잠시 후 다시 비춰 주세요';t2='계속 안 되면 등록데스크로';ms=2500}
+  const o=$('over'); o.className='k-over on '+cls; o.innerHTML='<div class="ic">'+ic+'</div><div class="t1">'+t1+'</div><div class="t2">'+t2+'</div>';
+  tone(cls==='ok'?'ok':cls==='dup'?'dup':'bad'); recAdd(cls,(r.team?r.team+'팀 ':'')+(r.label||'')+' '+(r.r||''));
+  PAUSE=true; clearTimeout(OVT); OVT=setTimeout(()=>{ o.className='k-over'; PAUSE=false },ms);   // 자동 복귀
+}
+function show(r){ KIOSK?kioskShow(r):staffShow(r) }
+
+/* ---------- 시작 ---------- */
+if(!S||!API_RE.test(API)) lock('세션 정보가 없습니다.');
+else { KIOSK?kioskUI():staffUI(); stat(); setInterval(stat,30000) }
 </script>
 </body></html>

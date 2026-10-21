@@ -5,56 +5,65 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>BIX 출석 스캔</title>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" integrity="sha384-hStSInNIZ8ljtOVrmrgf7zdHMapaLBWoSnPTtF0nzsybp4+LuhDz6sHuEVpWIX8o" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-:root{--navy:#0a1530;--mint:#d9f3e1;--yellow:#fef7d6;--red:#fde8e8;--surface:#f6f5f4;--primary:#5645d4}
-*{box-sizing:border-box}body{margin:0;font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;background:#fff;color:#1a1a1a;-webkit-user-select:none;user-select:none}
-.top{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.top b{font-size:17px}.sp{flex:1}
-.cnt{background:#1a2a52;border-radius:10px;padding:4px 12px;font-weight:700;font-size:18px}.cnt small{font-size:12px;color:#a4a097;font-weight:400}
-.wrap{display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:14px;padding:14px;max-width:1100px;margin:0 auto}
-.cam{position:relative;background:#000;border-radius:16px;overflow:hidden;aspect-ratio:4/3}.cam video{width:100%;height:100%;object-fit:cover;display:block}
-.frame{position:absolute;inset:14% 20%;border:3px solid #fff;border-radius:14px;box-shadow:0 0 0 999px #0005}.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ddd;text-align:center;padding:20px}
-.btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}.btn.sec{background:#fff;color:#1a1a1a;border:1px solid #c8c4be}
+/* 키비주얼 (사이드월 현수막): 검정 배경 · 라임 #B3D000 · 흰 글씨 · 무지개 리본 */
+:root{--bg:#000;--lime:#B3D000;--lime-d:#8FA600;--ink:#fff;--muted:#a8a8a8;--panel:#0f0f10;--line:#2b2b2e;
+--rib:linear-gradient(90deg,#B3D000 0%,#4FB39A 35%,#5871AB 68%,#7A4AB0 100%);
+--ok:#B3D000;--dup:#FFD43B;--bad:#F04438;--wait:#3B82F6}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);-webkit-user-select:none;user-select:none;min-height:100vh}
+.ribbon{position:fixed;right:0;bottom:0;width:min(560px,62vw);height:min(640px,72vh);background:url(assets/ribbon.webp) right bottom/contain no-repeat;opacity:.5;pointer-events:none;z-index:0}
+#main{position:relative;z-index:1}
+.badge{display:inline-block;background:var(--lime);color:#000;font-weight:900;border-radius:6px 6px 6px 0;padding:2px 9px;letter-spacing:-.3px}
+.lime{color:var(--lime)}
+/* ---- 운영자 스캔 ---- */
+.top{background:#000;border-bottom:3px solid transparent;border-image:var(--rib) 1;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top b{font-size:18px;font-weight:900;letter-spacing:-.5px}.sp{flex:1}
+.cnt{background:#141414;border:1px solid var(--line);border-radius:10px;padding:4px 12px;font-weight:900;font-size:18px;color:var(--lime)}.cnt small{font-size:12px;color:var(--muted);font-weight:500}
+.wrap{display:grid;grid-template-columns:minmax(280px,1fr) minmax(260px,1fr);gap:16px;padding:14px;max-width:1100px;margin:0 auto}
+.guide{background:#0d0d0d;border:1px solid var(--lime);color:var(--lime);border-radius:12px;padding:10px 14px;font-weight:800;margin:0 0 10px;font-size:16px}
+.cam{position:relative;background:#111;border-radius:16px;overflow:hidden;aspect-ratio:4/3;border:1px solid var(--line)}.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.frame{position:absolute;inset:14% 20%;border:4px solid var(--lime);border-radius:16px;box-shadow:0 0 0 999px #000a}
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ddd;text-align:center;padding:20px;font-weight:600}
+.tip{color:#000;background:var(--lime);border-radius:999px;padding:6px 14px;font-size:14px;font-weight:800;position:absolute;left:50%;bottom:10px;transform:translateX(-50%);white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.btn{background:var(--lime);color:#000;border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:800;cursor:pointer}.btn.sec{background:transparent;color:#fff;border:1px solid #555}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.res{border-radius:18px;padding:22px;text-align:center;min-height:190px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
-.res .big{font-size:36px;font-weight:800;letter-spacing:-.8px}.res .sub{font-size:18px;margin-top:6px}
-.res.ok{background:var(--mint);color:#0b6b2a}.res.dup{background:var(--yellow);color:#8a5a00}.res.bad{background:var(--red);color:#e03131}
-.rec div{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid #eee;font-size:14px}.note{color:#787671;font-size:13px}
-.lock{max-width:420px;margin:60px auto;text-align:center;padding:0 16px}
+h3{color:#fff}.rec div{display:flex;justify-content:space-between;padding:7px 2px;border-bottom:1px solid var(--line);font-size:14px}.note{color:var(--muted);font-size:13px}
+.lock{max-width:440px;margin:70px auto;text-align:center;padding:0 16px}.lock h2{font-weight:900}
 @media(max-width:800px){.wrap{grid-template-columns:1fr}}
 /* ---- 셀프 체크인(키오스크) ---- */
-body.kiosk{background:#000;overflow:hidden;height:100vh}
-.k-title{top:auto!important;bottom:calc(45% + min(29vw,25vh) + 1.5vh);font-size:min(5vw,36px)!important}
-.k-cam{position:fixed;inset:0;background:#000}.k-cam video{width:100%;height:100%;object-fit:cover}.k-cam video.mirror{transform:scaleX(-1)}
-.k-guide{position:fixed;left:50%;top:55%;width:min(58vw,50vh);height:min(58vw,50vh);transform:translate(-50%,-50%);border:6px solid #fff;border-radius:28px;box-shadow:0 0 0 9999px #000a}
-.k-title{position:fixed;left:0;right:0;top:4vh;text-align:center;color:#fff;font-size:min(6vw,44px);font-weight:800;letter-spacing:-1px;text-shadow:0 2px 12px #000}
-.k-sub{position:fixed;left:0;right:0;bottom:6vh;text-align:center;color:#ddd;font-size:min(3.4vw,22px)}
-.k-cnt{position:fixed;right:14px;bottom:10px;color:#888;font-size:13px}
-.k-over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:5vw;z-index:20}
-.k-over.on{display:flex}.k-over .ic{font-size:min(28vw,220px);line-height:1;font-weight:900}.k-over .t1{font-size:min(7vw,60px);font-weight:900;letter-spacing:-1.5px;margin-top:10px}.k-over .t2{font-size:min(4vw,30px);margin-top:14px;font-weight:600}
-.k-over.ok{background:#1aae39;color:#fff}.k-over.dup{background:#f5b301;color:#2a1d00}.k-over.bad{background:#e03131;color:#fff}
-.k-start{position:fixed;inset:0;z-index:30;background:#0a1530;color:#fff;display:none;align-items:center;justify-content:center;text-align:center;font-size:min(7vw,52px);font-weight:800;flex-direction:column;gap:16px}
-.k-start.on{display:flex}.k-start small{font-size:min(3.4vw,20px);font-weight:400;color:#a4a097}
+body.kiosk{overflow:hidden;height:100vh}
+body.kiosk #main{position:static;z-index:auto}
+.k-cam{position:fixed;inset:0;background:#000;z-index:0}.k-cam video{width:100%;height:100%;object-fit:cover}.k-cam video.mirror{transform:scaleX(-1)}
+body.kiosk .ribbon{z-index:2;opacity:.55;width:min(40vw,40vh);height:min(46vw,46vh)}
+.k-guide{position:fixed;left:50%;top:60%;width:min(54vw,44vh);height:min(54vw,44vh);transform:translate(-50%,-50%);border:7px solid var(--lime);border-radius:30px;box-shadow:0 0 0 9999px #000d;z-index:1}
+.k-head{position:fixed;left:0;right:0;top:2.2vh;text-align:center;z-index:5;font-weight:900;letter-spacing:-1px;font-size:min(4.6vw,34px)}
+.k-head .badge{font-size:.8em;margin-right:8px;vertical-align:.08em}
+.k-steps{position:fixed;left:0;right:0;top:calc(2.2vh + min(4.6vw,34px) + 2.2vh);display:flex;justify-content:center;gap:min(2.4vw,20px);padding:0 3vw;z-index:5;flex-wrap:wrap}
+.k-step{background:#111;border:1px solid #333;color:#fff;border-radius:16px;padding:min(1.4vw,10px) min(2.2vw,16px);display:flex;align-items:center;gap:8px;font-size:min(2.6vw,20px);font-weight:800}
+.k-step i{font-style:normal;font-size:min(4.4vw,34px)}.k-step b{display:inline-block;background:var(--lime);color:#000;border-radius:50%;width:1.6em;height:1.6em;line-height:1.6em;text-align:center;font-size:.8em;font-weight:900}
+.k-title{position:fixed;left:0;right:0;bottom:calc(40% + min(27vw,22vh) + 1.8vh);text-align:center;color:#fff;font-size:min(5vw,36px);font-weight:900;letter-spacing:-1px;z-index:5;text-shadow:0 2px 12px #000}
+.k-tip{position:fixed;left:0;right:0;bottom:max(4vh, calc(40% - min(27vw,22vh) - 8vh));text-align:center;z-index:5}.k-tip span{background:var(--lime);color:#000;border-radius:999px;padding:10px 22px;font-size:min(3.4vw,24px);font-weight:900}
+.k-cnt{position:fixed;right:14px;bottom:10px;color:#777;font-size:13px;z-index:5}
+.k-start{position:fixed;inset:0;z-index:30;background:#000 url(assets/ribbon.webp) right bottom/min(60vw,60vh) no-repeat;color:#fff;display:none;align-items:center;justify-content:center;text-align:center;font-size:min(7vw,52px);font-weight:900;flex-direction:column;gap:16px}
+.k-start.on{display:flex}.k-start small{font-size:min(3.4vw,20px);font-weight:500;color:var(--muted)}.k-start .badge{font-size:min(4vw,26px)}
 .k-corner{position:fixed;left:0;top:0;width:90px;height:90px;z-index:25}
-.k-menu{position:fixed;inset:0;z-index:40;background:#000c;display:none;align-items:center;justify-content:center;padding:16px}.k-menu.on{display:flex}
-.k-box{background:#fff;color:#1a1a1a;border-radius:18px;padding:20px;width:min(520px,100%);max-height:90vh;overflow:auto}
-/* ---- 결과 팝업·안내 ---- */
-.pop{position:fixed;inset:0;z-index:50;background:#0008;display:none;align-items:center;justify-content:center;padding:5vw}.pop.on{display:flex}
-.pop .card{width:min(680px,100%);border-radius:28px;padding:min(6vw,44px) min(5vw,36px);text-align:center;box-shadow:0 20px 60px #0006;animation:popin .18s ease-out}
-@keyframes popin{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
-.pop .ic{width:min(22vw,130px);height:min(22vw,130px);border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:min(14vw,84px);font-weight:900;color:#fff}
-.pop .m{font-size:min(6vw,38px);font-weight:800;letter-spacing:-1px;line-height:1.3}.pop .s{font-size:min(4vw,22px);margin-top:10px;opacity:.85}.pop .x{font-size:13px;margin-top:14px;opacity:.6}
-.pop.ok .card{background:#e7f8ec;color:#0b6b2a}.pop.ok .ic{background:#1aae39}
-.pop.dup .card{background:#fff6dc;color:#7a5200}.pop.dup .ic{background:#f5b301}
-.pop.bad .card{background:#fdecec;color:#b42318}.pop.bad .ic{background:#e03131}
-.pop.wait .card{background:#e8f1ff;color:#1d4fa8}.pop.wait .ic{background:#2f6fdb}
-.guide{background:#eef0ff;color:#2b2280;border-radius:12px;padding:10px 14px;font-weight:700;margin:0 0 10px;font-size:16px}
-.tip{color:#fff;background:#0009;border-radius:999px;padding:6px 14px;font-size:14px;position:absolute;left:50%;bottom:10px;transform:translateX(-50%);white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
-.k-steps{position:fixed;left:0;right:0;top:2.5vh;display:flex;justify-content:center;gap:min(3vw,24px);padding:0 3vw;z-index:5}
-.k-step{background:#ffffffee;color:#0a1530;border-radius:18px;padding:min(1.6vw,12px) min(2.4vw,18px);display:flex;align-items:center;gap:10px;font-size:min(2.8vw,22px);font-weight:800;box-shadow:0 4px 16px #0004}
-.k-step i{font-style:normal;font-size:min(5vw,40px)}.k-step b{display:inline-block;background:#5645d4;color:#fff;border-radius:50%;width:1.6em;height:1.6em;line-height:1.6em;text-align:center;font-size:.8em}
-.k-tip{position:fixed;left:0;right:0;bottom:12vh;text-align:center;z-index:5}.k-tip span{background:#000b;color:#fff;border-radius:999px;padding:10px 22px;font-size:min(3.6vw,26px);font-weight:700}
+.k-menu{position:fixed;inset:0;z-index:40;background:#000d;display:none;align-items:center;justify-content:center;padding:16px}.k-menu.on{display:flex}
+.k-box{background:#111;color:#fff;border:1px solid #333;border-radius:18px;padding:20px;width:min(520px,100%);max-height:90vh;overflow:auto}
+.k-over{display:none}
+/* ---- 결과 팝업 (검정 배경에서 또렷하게) ---- */
+.pop{position:fixed;inset:0;z-index:50;background:#000c;display:none;align-items:center;justify-content:center;padding:5vw}.pop.on{display:flex}
+.pop .card{width:min(680px,100%);border-radius:28px;padding:min(6vw,44px) min(5vw,36px);text-align:center;box-shadow:0 0 0 4px #000,0 24px 70px #000;animation:popin .16s ease-out}
+@keyframes popin{from{transform:scale(.88);opacity:.2}to{transform:none;opacity:1}}
+.pop .ic{width:min(22vw,130px);height:min(22vw,130px);border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:min(14vw,84px);font-weight:900;background:#000}
+.pop .m{font-size:min(6vw,38px);font-weight:900;letter-spacing:-1px;line-height:1.3}.pop .s{font-size:min(4vw,22px);margin-top:10px;font-weight:700}.pop .x{font-size:13px;margin-top:14px;opacity:.7}
+.pop.ok .card{background:var(--ok);color:#000}.pop.ok .ic{color:var(--ok)}
+.pop.dup .card{background:var(--dup);color:#000}.pop.dup .ic{color:var(--dup)}
+.pop.bad .card{background:var(--bad);color:#fff}.pop.bad .ic{color:var(--bad);background:#fff}
+.pop.wait .card{background:var(--wait);color:#fff}.pop.wait .ic{color:var(--wait);background:#fff}
 </style></head><body>
-<div id="main"></div>
+<div class="ribbon" aria-hidden="true"></div><div id="main"></div>
 <script>
 'use strict';
 /* 코드만 있는 페이지 — 명단·연락처 없음. 세션·API 주소·모드는 운영자 화면에서 받은 링크의 # 뒤에서만 읽고 바로 지움 */
@@ -147,11 +156,11 @@ async function photo(inp){ const f=inp.files&&inp.files[0]; if(!f||typeof jsQR!=
     const q=jsQR(x.getImageData(0,0,w,h).data,w,h,{inversionAttempts:'attemptBoth'}); if(q&&q.data){ LAST={t:'',at:0}; return handle(q.data) } }
   show({r:'invalid',local:true}) }
 
-function lock(msg){ stopCam(); document.body.className=''; $('main').innerHTML='<div class="lock"><h2>스캔 페이지를 열 수 없어요</h2><p class="note">'+msg+'</p><p class="note">운영자 화면 › QR 스캔 › 「📷 카메라 스캔 열기」 또는 「📷 셀프 체크인 열기」로 다시 열어 주세요.</p></div>' }
+function lock(msg){ stopCam(); document.body.className=''; $('main').innerHTML='<div class="lock"><p><span class="badge">BIX 2026</span></p><h2>스캔 페이지를 열 수 없어요</h2><p class="note">'+msg+'</p><p class="note">운영자 화면 › QR 스캔 › 「📷 카메라 스캔 열기」 또는 「📷 셀프 체크인 열기」로 다시 열어 주세요.</p></div>' }
 
 /* ---------- 운영자 모드 화면 ---------- */
 function staffUI(){
-  $('main').innerHTML=`<div class="top"><b>BIX 킥오프 출석 스캔</b><span class="sp"></span><span class="cnt" id="cnt">– <small>출석</small></span></div>
+  $('main').innerHTML=`<div class="top"><span class="badge">BIX 2026</span><b>킥오프 출석 스캔</b><span class="sp"></span><span class="cnt" id="cnt">– <small>출석</small></span></div>
  <div class="wrap"><div><div class="guide">참가자 휴대폰 QR을 상자에 맞춰 찍어 주세요</div><div class="cam"><video id="v" playsinline muted></video><div class="frame"></div><div class="tip" id="tip">${TIPS[0]}</div><div class="ph" id="ph">「카메라 켜기」를 누르고<br>참가자 휴대폰의 개인 QR을 상자에 맞춰 주세요</div></div>
  <div class="row"><button class="btn" id="cb" onclick="staffToggle()">카메라 켜기</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" capture="environment" style="display:none" onchange="photo(this)"></label></div>
  <p class="note" id="note">연속 스캔 · 같은 QR은 3초 안에 다시 읽지 않음</p></div>
@@ -165,10 +174,11 @@ function staffShow(r){ return popup(r) }
 function kioskUI(){
   document.body.className='kiosk';
   $('main').innerHTML=`<div class="k-cam"><video id="v" playsinline muted autoplay></video></div><div class="k-guide"></div>
+ <div class="k-head"><span class="badge">BIX 2026</span>부산 <span class="lime">지산학</span> 혁신대전 킥오프</div>
  <div class="k-steps"><div class="k-step"><b>1</b><i>💬</i>문자 링크 열기</div><div class="k-step"><b>2</b><i>🔆</i>밝기 올리기</div><div class="k-step"><b>3</b><i>🔲</i>상자에 비추기</div></div>
  <div class="k-title">휴대폰 QR을 여기에 비춰 주세요</div><div class="k-tip"><span id="tip">${TIPS[0]}</span></div><div class="k-cnt" id="cnt"></div>
  <div class="k-over" id="over"></div>
- <div class="k-start" id="start" onclick="kioskStart(true)">눌러서 시작<small>카메라를 켜고 셀프 체크인을 시작합니다</small></div>
+ <div class="k-start" id="start" onclick="kioskStart(true)"><span class="badge">BIX 2026 · 셀프 체크인</span>눌러서 시작<small>카메라를 켜고 셀프 체크인을 시작합니다</small></div>
  <div class="k-corner" id="corner"></div>
  <div class="k-menu" id="menu"><div class="k-box"><h3 style="margin:0 0 8px">운영자 메뉴</h3><p class="note" id="mInfo"></p>
   <div class="row"><button class="btn" onclick="flipCam()">전면/후면 전환</button><label class="btn sec">사진으로 스캔<input type="file" accept="image/*" style="display:none" onchange="closeMenu();photo(this)"></label>
@@ -185,7 +195,7 @@ async function kioskStart(fromTap){
   if(STARTING) return; STARTING=true;
   try{ if(fromTap){ try{ audio=audio||new (window.AudioContext||window.webkitAudioContext)(); audio.resume&&audio.resume() }catch(e){} }
     await startCam(); $('start').classList.remove('on'); if(fromTap) wake() }
-  catch(e){ $('start').classList.add('on'); $('start').innerHTML=(e&&e.name==='NotAllowedError'?'카메라 허용이 필요해요':'눌러서 시작')+'<small>'+(e&&e.name==='NotAllowedError'?'사파리 설정 › 카메라 › 허용 후 눌러 주세요':'카메라를 켜고 셀프 체크인을 시작합니다')+'</small>' }
+  catch(e){ $('start').classList.add('on'); $('start').innerHTML='<span class="badge">BIX 2026 · 셀프 체크인</span>'+(e&&e.name==='NotAllowedError'?'카메라 허용이 필요해요':'눌러서 시작')+'<small>'+(e&&e.name==='NotAllowedError'?'사파리 설정 › 카메라 › 허용 후 눌러 주세요':'카메라를 켜고 셀프 체크인을 시작합니다')+'</small>' }
   finally{ STARTING=false } }
 function kioskWatch(){ const v=$('v'); if(!v||$('start').classList.contains('on')) return;
   const live=CAM.st&&CAM.st.getVideoTracks().some(t=>t.readyState==='live');
